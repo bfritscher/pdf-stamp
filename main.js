@@ -233,6 +233,7 @@ async function renderPage(pageNumber) {
     const context = canvas.getContext('2d');
     canvas.height = viewport.height;
     canvas.width = viewport.width;
+    pdfRenderer.stampCanvas = new fabric.Canvas(pdfRenderer.canvas);
     pageBox.style.width = `${viewport.width}px`;
     pageBox.style.height = `${viewport.height}px`;
     // Render PDF page into canvas context
@@ -245,7 +246,30 @@ async function renderPage(pageNumber) {
     renderStamps();
 }
 
+function updateStamp(stamp, img, div) {
+    stamp.x = img.left;
+    stamp.y = img.top;
+    stamp.scaleX = img.scaleX;
+    stamp.scaleY = img.scaleY;
+    stamp.angle = img.angle;
+    div.style.width = `${stamp.width * stamp.scaleX}px`;
+    const topLeftX = stamp.x;
+    const topLeftY = stamp.y;
+    const height = stamp.height * stamp.scaleY;
+    const angle = -stamp.angle;
+    const radians = angle * (Math.PI / 180);
+    const bottomLeftX = topLeftX + height * Math.sin(radians);
+    const bottomLeftY = topLeftY + height * Math.cos(radians);
+    div.style.transform = `translate(${bottomLeftX}px, ${bottomLeftY}px)`;
+
+}
+
 function renderStamps() {
+    let stampCanvas = document.createElement('canvas');
+    stampCanvas.height = pdfRenderer.viewport.height;
+    stampCanvas.width = pdfRenderer.viewport.width;
+    pageBox.append(stampCanvas);
+    stampCanvas = new fabric.Canvas(stampCanvas);
     pdfRenderer.stamps.forEach(s => {
         if (s.startPage > pdfRenderer.pageNum) {
             return;
@@ -256,64 +280,69 @@ function renderStamps() {
         if (s.repeatPage === 0 && s.startPage !== pdfRenderer.pageNum) {
             return;
         }
-        const div = document.createElement('div');
-        div.classList.add('stamp');
-        const img = document.createElement('img');
-        img.src = s.url;
-        img.style.opacity = s.opacity;
-        div.style.width = `${s.width}px`;
-        div.style.height = `${s.height}px`;
-        div.style.transform = `translate(${s.x}px, ${s.y}px)`;
-        div._stamp = s;
-        div.append(img)
-        const topleft = document.createElement('div');
-        topleft.classList.add('corner', 'top-left')
-        div.append(topleft);
-        const topright = document.createElement('div');
-        topright.classList.add('corner', 'top-right')
-        div.append(topright);
-        const bottomleft = document.createElement('div');
-        bottomleft.classList.add('corner', 'bottom-left')
-        div.append(bottomleft);
-        const bottomright = document.createElement('div');
-        bottomright.classList.add('corner', 'bottom-right')
-        div.append(bottomright);
-        const actionBar = document.createElement('div');
-        actionBar.classList.add('action-bar');
-        div.append(actionBar);
-        const inputRepeat = document.createElement('input');
-        inputRepeat.type = 'number';
-        inputRepeat.value = s.repeatPage;
-        inputRepeat.min = 0;
-        inputRepeat.classList.add('repeat');
-        inputRepeat.addEventListener('change', (event) => {
-            s.repeatPage = parseInt(event.target.value);
-        })
-        actionBar.append(inputRepeat);
-        const inputOpacity = document.createElement('input');
-        inputOpacity.type = 'number';
-        inputOpacity.min = 0;
-        inputOpacity.max = 1;
-        inputOpacity.step = 0.05;
-        inputOpacity.value = s.opacity;
-        inputOpacity.classList.add('opacity');
-        inputOpacity.addEventListener('change', (event) => {
-            s.opacity = parseFloat(event.target.value);
-            img.style.opacity = s.opacity;
-        })
-        actionBar.append(inputOpacity);
 
-        const btnRemove = document.createElement('button');
-        btnRemove.innerText = 'X';
-        btnRemove.classList.add('remove');
-        actionBar.append(btnRemove);
-        btnRemove.addEventListener('click', (event) => {
-            event.stopImmediatePropagation();
-            const index = pdfRenderer.stamps.indexOf(s);
-            pdfRenderer.stamps.splice(index, 1);
-            div.remove();
-        })
-        pageBox.append(div);
+        fabric.Image.fromURL(s.url, (img, err) => {
+            const div = document.createElement('div');
+            div.classList.add('stamp');
+
+            img.on('moving', function () { updateStamp(s, img, div); });
+            img.on('scaling', function () { updateStamp(s, img, div); });
+            img.on('rotating', function () { updateStamp(s, img, div); });
+            img.on('selected', function () { div.style.display = 'block'; });
+            img.on('deselected', function () { div.style.display = 'none'; });
+            stampCanvas.add(img);
+            div.style.display = 'none';
+            div.style.width = `${s.width * s.scaleX}px`;
+            div.style.transform = `translate(${s.x}px, ${s.y + (s.height * s.scaleY)}px)`;
+            div._stamp = s;
+            const actionBar = document.createElement('div');
+            actionBar.classList.add('action-bar');
+            div.append(actionBar);
+            const inputRepeat = document.createElement('input');
+            inputRepeat.type = 'number';
+            inputRepeat.value = s.repeatPage;
+            inputRepeat.min = 0;
+            inputRepeat.classList.add('repeat');
+            inputRepeat.addEventListener('change', (event) => {
+                s.repeatPage = parseInt(event.target.value);
+            })
+            actionBar.append(inputRepeat);
+            const inputOpacity = document.createElement('input');
+            inputOpacity.type = 'range';
+            inputOpacity.min = 0;
+            inputOpacity.max = 100;
+            inputOpacity.value = s.opacity * 100;
+            inputOpacity.classList.add('opacity');
+            inputOpacity.addEventListener('input', (event) => {
+                s.opacity = parseFloat(event.target.value) / 100;
+                img.opacity = s.opacity;
+                stampCanvas.requestRenderAll();
+            })
+            actionBar.append(inputOpacity);
+
+            const btnRemove = document.createElement('button');
+            btnRemove.innerText = 'X';
+            btnRemove.classList.add('remove');
+            actionBar.append(btnRemove);
+            btnRemove.addEventListener('click', (event) => {
+                event.stopImmediatePropagation();
+                const index = pdfRenderer.stamps.indexOf(s);
+                pdfRenderer.stamps.splice(index, 1);
+                div.remove();
+                stampCanvas.remove(img);
+                stampCanvas.requestRenderAll();
+            })
+            pageBox.append(div);
+
+
+        }, {
+            left: s.x,
+            top: s.y,
+            opacity: s.opacity,
+            scaleX: s.scaleX,
+            scaleY: s.scaleY,
+            angle: s.angle,
+        });
     })
 }
 
@@ -325,15 +354,22 @@ function addStamp(srcStamp) {
     pdfRenderer.stamps.push({
         x: 0,
         y: 0,
-        width: srcStamp.width * scale,
-        height: srcStamp.height * scale,
+        width: srcStamp.width,
+        height: srcStamp.height,
+        scaleX: scale,
+        scaleY: scale,
         opacity: 1.0,
+        angle: 0,
         startPage: pdfRenderer.pageNum,
         repeatPage: 0,
         url: srcStamp.url
     });
     renderPage(pdfRenderer.pageNum);
 }
+
+function toRadians(degree) {
+    return degree * (Math.PI / 180);
+};
 
 async function generateStampedPdf() {
     const pdfDoc = await PDFLib.PDFDocument.load(await pdfRenderer.pdf.getData());
@@ -346,10 +382,42 @@ async function generateStampedPdf() {
             const page = pdfDoc.getPage(i);
 
             // Convert coordinates from web (viewport) to PDF reference
+            const pdfWidth = stamp.width * stamp.scaleX;
+            const pdfHeight = stamp.height * stamp.scaleY;
             const pdfX = stamp.x;
-            const pdfY = pdfRenderer.viewport.height - stamp.y - stamp.height;
-            const pdfWidth = stamp.width;
-            const pdfHeight = stamp.height;
+            const pdfY = pdfRenderer.viewport.height - stamp.y - pdfHeight;
+
+            let originX = pdfX;
+            let originY = pdfY + pdfHeight;
+            let angle = toRadians(-stamp.angle);
+
+            page.pushOperators(
+                PDFLib.pushGraphicsState(),
+                PDFLib.concatTransformationMatrix(
+                    1,
+                    0,
+                    0,
+                    1,
+                    originX,
+                    originY,
+                ),
+                PDFLib.concatTransformationMatrix(
+                    Math.cos(angle),
+                    Math.sin(angle),
+                    -Math.sin(angle),
+                    Math.cos(angle),
+                    0,
+                    0,
+                ),
+                PDFLib.concatTransformationMatrix(
+                    1,
+                    0,
+                    0,
+                    1,
+                    -1 * originX,
+                    -1 * originY,
+                ),
+            );
 
             // Draw the image on the PDF page at the converted coordinates
             page.drawImage(image, {
@@ -360,7 +428,9 @@ async function generateStampedPdf() {
                 opacity: stamp.opacity,
                 // TODO: blendMode use cases?
             });
-
+            page.pushOperators(
+                PDFLib.popGraphicsState(),
+            );
             // does not work for some pdfs with white backgrounds in text
             // using opacity does work for text
             const drawBehind = false;
@@ -392,54 +462,3 @@ async function generateStampedPdf() {
     URL.revokeObjectURL(url);
     downloadLink.remove();
 }
-
-interact('.stamp')
-    .draggable({
-        listeners: {
-            move: function (event) {
-                const { target } = event;
-                const x = target._stamp.x + event.dx;
-                const y = target._stamp.y + event.dy;
-                target.style.transform = `translate(${x}px, ${y}px)`;
-                target._stamp.x = x;
-                target._stamp.y = y;
-            },
-        },
-        modifiers: [
-            interact.modifiers.restrictRect({
-                restriction: 'parent',
-                endOnly: false
-            })
-        ]
-    })
-    .resizable({
-        // resize from all edges and corners
-        edges: { left: true, right: true, bottom: true, top: true },
-        listeners: {
-            move(event) {
-                const { target } = event;
-                let { width, height } = event.rect;
-
-                target.style.width = `${width}px`;
-                target.style.height = `${height}px`;
-
-                const x = target._stamp.x + event.deltaRect.left;
-                const y = target._stamp.y + event.deltaRect.top;
-
-                target.style.transform = `translate(${x}px, ${y}px)`;
-
-                target._stamp.x = x;
-                target._stamp.y = y;
-                target._stamp.width = width;
-                target._stamp.height = height;
-            }
-        },
-        modifiers: [
-            interact.modifiers.restrictEdges({
-                outer: 'parent',
-            }),
-            interact.modifiers.restrictSize({
-                min: { width: 50, height: 50 },
-            })
-        ]
-    });

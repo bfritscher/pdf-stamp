@@ -10,8 +10,8 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Fira+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap"
         rel="stylesheet">
-    <script src="https://unpkg.com/interactjs@1.10.27/dist/interact.min.js"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.js"> </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
         :root {
             --primary-color: #28a745;
@@ -131,12 +131,18 @@
             border: 2px solid red;
         }
 
-        #pageBox>.stamp {
+        #pageBox >.stamp {
             position: absolute;
             top: 0;
             left: 0;
             display: block;
             user-select: none;
+        }
+
+        #pageBox > .canvas-container {
+            position: absolute !important;
+            top: 0;
+            left: 0;
         }
 
         .stamp>img {
@@ -146,7 +152,6 @@
 
         .stamp .action-bar {
             position: absolute;
-            bottom: -20px;
             left: 0;
             right: 0;
             background-color: #dbd9d980;
