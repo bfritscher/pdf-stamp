@@ -19,7 +19,6 @@ let srcStamps = [];
 loadSrcStamps();
 
 const loadTab = document.getElementById("loadTab");
-const stampTab = document.getElementById("stampTab");
 const downloadTab = document.getElementById("downloadTab");
 downloadTab.addEventListener('click', () => {
     generateStampedPdf();
@@ -27,17 +26,16 @@ downloadTab.addEventListener('click', () => {
 
 const loadSection = document.getElementById("loadSection");
 const stampSection = document.getElementById("stampSection");
+const dialog = document.getElementById('signature-dialog');
+const colorPicker = document.getElementById('color-picker');
+colorPicker.addEventListener('input', (event) => {
+    signaturePad.penColor = event.target.value;
+  });
 
 loadTab.addEventListener("click", () => {
     showSection(loadSection);
     setActiveTab(loadTab);
 });
-
-stampTab.addEventListener("click", () => {
-    showSection(stampSection);
-    setActiveTab(stampTab);
-});
-
 
 function showSection(section) {
     loadSection.classList.remove("active");
@@ -47,8 +45,10 @@ function showSection(section) {
 
 function setActiveTab(activeTab) {
     loadTab.classList.remove("active");
-    stampTab.classList.remove("active");
-    activeTab.classList.add("active");
+    if (activeTab) {
+        activeTab.classList.add("active");
+        downloadTab.disabled = true;
+    }
 }
 
 
@@ -86,30 +86,46 @@ btnLoad.addEventListener('click', () => {
     loadPdf(urlInput.value);
 });
 
+
 const padCanvas = document.getElementById('padCanvas');
 const signaturePad = new SignaturePad(padCanvas);
 const padClear = document.getElementById('padClear');
+const padClose = document.getElementById('padClose');
+padClose.addEventListener('click', () => {
+    dialog.close();
+});
+
 padClear.addEventListener('click', () => {
     signaturePad.clear();
 });
 const padStampAdd = document.getElementById('padStampAdd');
 padStampAdd.addEventListener('click', () => {
-    addSrcStamp(
-        {
-            width: padCanvas.width,
-            height: padCanvas.height,
-            url: signaturePad.toDataURL()
-        }
-    );
+    if(!signaturePad.isEmpty()){
+        addSrcStamp(
+            {
+                width: padCanvas.width,
+                height: padCanvas.height,
+                url: signaturePad.toDataURL()
+            }
+        );
+    }
     signaturePad.clear();
+    dialog.close();
 });
+
+
+const loadImage = document.getElementById('loadImage');
+loadImage.addEventListener('click', handleAddSrcStamp);
 
 function renderSrcStampsPreview() {
     const srcStampsPreview = document.getElementById('srcStampsPreview');
     srcStampsPreview.innerHTML = '';
     const btnAdd = document.createElement('button');
-    btnAdd.innerText = 'Add';
-    btnAdd.addEventListener('click', handleAddSrcStamp);
+    btnAdd.innerText = 'Add'
+    btnAdd.id = 'addSrcStamp';
+    btnAdd.addEventListener('click', () => {
+        showDialog();
+    });
     srcStampsPreview.append(btnAdd);
 
     srcStamps.forEach(s => {
@@ -119,6 +135,7 @@ function renderSrcStampsPreview() {
         stamp.addEventListener('click', () => addStamp(s));
         const remove = document.createElement('button');
         remove.innerText = 'X';
+        remove.classList.add('remove');
         stamp.append(remove);
         remove.addEventListener('click', (event) => {
             event.stopImmediatePropagation();
@@ -148,6 +165,7 @@ function handleAddSrcStamp() {
                     url: reader.result
                 };
                 addSrcStamp(srcStamp);
+                dialog.close();
             };
             img.src = reader.result;
         };
@@ -156,7 +174,16 @@ function handleAddSrcStamp() {
     input.click();
 }
 
+function showDialog() {
+    dialog.showModal();
+    resizeCanvas();
+    signaturePad.clear();
+}
+
 function addSrcStamp(srcStamp) {
+    if (srcStamps.length === 0) {
+        addStamp(srcStamp);
+    }
     srcStamps.push(srcStamp);
     renderSrcStampsPreview();
     saveSrcStamps();
@@ -213,8 +240,11 @@ async function loadPdf(src) {
     pdfRenderer.numPages = pdfRenderer.pdf.numPages;
     pdfRenderer.stamps = [];
     renderPage(1);
-    setActiveTab(stampTab);
     showSection(stampSection);
+    setActiveTab(null);
+    if(srcStamps.length === 0){
+        showDialog();
+    }
 }
 
 async function renderPage(pageNumber) {
@@ -244,7 +274,27 @@ async function renderPage(pageNumber) {
     await page.render(renderContext).promise;
     console.debug('Page rendered');
     renderStamps();
+    resizePageBox();
+    renderPdfNav();
+    renderDownloadTab();
 }
+
+function renderPdfNav() {
+    if (pdfRenderer.numPages > 1) {
+        pdfNav.style.display = 'flex';
+    } else {
+        pdfNav.style.display = 'none';
+    }
+}
+
+function renderDownloadTab() {
+    if (pdfRenderer.stamps.length > 0) {
+        downloadTab.disabled = false;
+    } else {
+        downloadTab.disabled = true;
+    }
+}
+
 
 function updateStamp(stamp, img, div) {
     stamp.x = img.left;
@@ -255,7 +305,7 @@ function updateStamp(stamp, img, div) {
     div.style.width = `${stamp.width * stamp.scaleX}px`;
     const topLeftX = stamp.x;
     const topLeftY = stamp.y;
-    const height = stamp.height * stamp.scaleY;
+    const height = (stamp.height + 20 ) * stamp.scaleY;
     const angle = -stamp.angle;
     const radians = angle * (Math.PI / 180);
     const bottomLeftX = topLeftX + height * Math.sin(radians);
@@ -299,6 +349,7 @@ function renderStamps() {
             actionBar.classList.add('action-bar');
             div.append(actionBar);
             const inputRepeat = document.createElement('input');
+            inputRepeat.classList.add('repeat');
             inputRepeat.type = 'number';
             inputRepeat.value = s.repeatPage;
             inputRepeat.min = 0;
@@ -306,19 +357,27 @@ function renderStamps() {
             inputRepeat.addEventListener('change', (event) => {
                 s.repeatPage = parseInt(event.target.value);
             })
-            actionBar.append(inputRepeat);
+            const inputRepeatLabel = document.createElement('label');
+            inputRepeatLabel.innerText = 'Repeat on every n page';
+            inputRepeatLabel.append(inputRepeat);
+            actionBar.append(inputRepeatLabel);
+
             const inputOpacity = document.createElement('input');
+            inputOpacity.classList.add('opacity');
             inputOpacity.type = 'range';
             inputOpacity.min = 0;
             inputOpacity.max = 100;
             inputOpacity.value = s.opacity * 100;
-            inputOpacity.classList.add('opacity');
             inputOpacity.addEventListener('input', (event) => {
                 s.opacity = parseFloat(event.target.value) / 100;
                 img.opacity = s.opacity;
                 stampCanvas.requestRenderAll();
             })
-            actionBar.append(inputOpacity);
+
+            const inputOpacityLabel = document.createElement('label');
+            inputOpacityLabel.innerText = 'Opacity';
+            inputOpacityLabel.append(inputOpacity);
+            actionBar.append(inputOpacityLabel);
 
             const btnRemove = document.createElement('button');
             btnRemove.innerText = 'X';
@@ -462,3 +521,32 @@ async function generateStampedPdf() {
     URL.revokeObjectURL(url);
     downloadLink.remove();
 }
+
+// fit on mobile
+function resizePageBox() {
+    const pageBox = document.getElementById('pageBox');
+    const viewportWidth = Math.min(window.innerWidth, document.documentElement.clientWidth - 40);
+    const pageBoxWidth = pageBox.offsetWidth;
+
+    const ratio = viewportWidth / pageBoxWidth;
+
+    if (ratio < 1) {
+        pageBox.style.transform = `scale(${ratio})`;
+    } else {
+        pageBox.style.transform = 'scale(1)';
+    }
+}
+
+
+// Initial call to resizePageBox on page load
+resizePageBox();
+
+// Add event listener for window resize
+window.addEventListener('resize', resizePageBox, false);
+// Ensure canvas is sized correctly
+function resizeCanvas() {
+    padCanvas.width = padCanvas.offsetWidth;
+    padCanvas.height = padCanvas.offsetHeight;
+}
+
+resizeCanvas();
