@@ -74,7 +74,7 @@ fileInput.addEventListener('change', handleFileInputChange);
 fileInput.addEventListener('paste', handleFilePaste);
 
 const urlInput = document.getElementById('urlInput');
-urlInput.value = 'https://pdfobject.com/pdf/sample.pdf';
+urlInput.value = ''; //demo: https://pdfobject.com/pdf/sample.pdf, https://ontheline.trincoll.edu/images/bookdown/sample-local-pdf.pdf
 
 const btnLoad = document.getElementById('loadURL');
 btnLoad.addEventListener('click', () => {
