@@ -12,7 +12,8 @@ const pdfRenderer = {
     pdf: undefined,
     viewport: undefined,
     filename: '',
-    stamps: []
+    stamps: [],
+    textStamps: [] // Added for text stamps
 }
 
 let srcStamps = [];
@@ -239,6 +240,7 @@ async function loadPdf(src) {
     pageNum.setAttribute('max', pdfRenderer.pdf.numPages);
     pdfRenderer.numPages = pdfRenderer.pdf.numPages;
     pdfRenderer.stamps = [];
+    pdfRenderer.textStamps = []; // Added for text stamps
     renderPage(1);
     showSection(stampSection);
     setActiveTab(null);
@@ -288,7 +290,7 @@ function renderPdfNav() {
 }
 
 function renderDownloadTab() {
-    if (pdfRenderer.stamps.length > 0) {
+    if (pdfRenderer.stamps.length > 0 || pdfRenderer.textStamps.length > 0) { // Updated to include text stamps
         downloadTab.disabled = false;
     } else {
         downloadTab.disabled = true;
@@ -402,7 +404,108 @@ function renderStamps() {
             scaleY: s.scaleY,
             angle: s.angle,
         });
-    })
+    });
+
+    // Render text stamps
+    pdfRenderer.textStamps.forEach(t => {
+        if (t.startPage > pdfRenderer.pageNum) {
+            return;
+        }
+        if (t.repeatPage > 0 && (pdfRenderer.pageNum - t.startPage) % t.repeatPage !== 0) {
+            return;
+        }
+        if (t.repeatPage === 0 && t.startPage !== pdfRenderer.pageNum) {
+            return;
+        }
+
+        const text = new fabric.Text(t.text, {
+            left: t.x,
+            top: t.y,
+            fill: t.color,
+            fontFamily: t.fontFamily,
+            fontSize: t.fontSize,
+            angle: t.angle,
+            opacity: t.opacity,
+        });
+
+        const div = document.createElement('div');
+        div.classList.add('stamp');
+
+        text.on('moving', function () { updateTextStamp(t, text, div); });
+        text.on('scaling', function () { updateTextStamp(t, text, div); });
+        text.on('rotating', function () { updateTextStamp(t, text, div); });
+        text.on('selected', function () { div.style.display = 'block'; });
+        text.on('deselected', function () { div.style.display = 'none'; });
+        stampCanvas.add(text);
+        div.style.display = 'none';
+        div.style.width = `${t.width * t.scaleX}px`;
+        div.style.transform = `translate(${t.x}px, ${t.y + (t.height * t.scaleY)}px)`;
+        div._stamp = t;
+        const actionBar = document.createElement('div');
+        actionBar.classList.add('action-bar');
+        div.append(actionBar);
+        const inputRepeat = document.createElement('input');
+        inputRepeat.classList.add('repeat');
+        inputRepeat.type = 'number';
+        inputRepeat.value = t.repeatPage;
+        inputRepeat.min = 0;
+        inputRepeat.classList.add('repeat');
+        inputRepeat.addEventListener('change', (event) => {
+            t.repeatPage = parseInt(event.target.value);
+        })
+        const inputRepeatLabel = document.createElement('label');
+        inputRepeatLabel.innerText = 'Repeat on every n page';
+        inputRepeatLabel.append(inputRepeat);
+        actionBar.append(inputRepeatLabel);
+
+        const inputOpacity = document.createElement('input');
+        inputOpacity.classList.add('opacity');
+        inputOpacity.type = 'range';
+        inputOpacity.min = 0;
+        inputOpacity.max = 100;
+        inputOpacity.value = t.opacity * 100;
+        inputOpacity.addEventListener('input', (event) => {
+            t.opacity = parseFloat(event.target.value) / 100;
+            text.opacity = t.opacity;
+            stampCanvas.requestRenderAll();
+        })
+
+        const inputOpacityLabel = document.createElement('label');
+        inputOpacityLabel.innerText = 'Opacity';
+        inputOpacityLabel.append(inputOpacity);
+        actionBar.append(inputOpacityLabel);
+
+        const btnRemove = document.createElement('button');
+        btnRemove.innerText = 'X';
+        btnRemove.classList.add('remove');
+        actionBar.append(btnRemove);
+        btnRemove.addEventListener('click', (event) => {
+            event.stopImmediatePropagation();
+            const index = pdfRenderer.textStamps.indexOf(t);
+            pdfRenderer.textStamps.splice(index, 1);
+            div.remove();
+            stampCanvas.remove(text);
+            stampCanvas.requestRenderAll();
+        })
+        pageBox.append(div);
+    });
+}
+
+function updateTextStamp(stamp, text, div) {
+    stamp.x = text.left;
+    stamp.y = text.top;
+    stamp.scaleX = text.scaleX;
+    stamp.scaleY = text.scaleY;
+    stamp.angle = text.angle;
+    div.style.width = `${stamp.width * stamp.scaleX}px`;
+    const topLeftX = stamp.x;
+    const topLeftY = stamp.y;
+    const height = (stamp.height + 20 ) * stamp.scaleY;
+    const angle = -stamp.angle;
+    const radians = angle * (Math.PI / 180);
+    const bottomLeftX = topLeftX + height * Math.sin(radians);
+    const bottomLeftY = topLeftY + height * Math.cos(radians);
+    div.style.transform = `translate(${bottomLeftX}px, ${bottomLeftY}px)`;
 }
 
 function addStamp(srcStamp) {
@@ -422,6 +525,30 @@ function addStamp(srcStamp) {
         startPage: pdfRenderer.pageNum,
         repeatPage: 0,
         url: srcStamp.url
+    });
+    renderPage(pdfRenderer.pageNum);
+}
+
+function addTextStamp(text, color, fontFamily, fontSize) {
+    const scaleX = pdfRenderer.viewport.width / fontSize;
+    const scaleY = pdfRenderer.viewport.height / fontSize;
+    const scale = Math.min(scaleX, scaleY, 1.0);
+
+    pdfRenderer.textStamps.push({
+        x: 0,
+        y: 0,
+        width: fontSize,
+        height: fontSize,
+        scaleX: scale,
+        scaleY: scale,
+        opacity: 1.0,
+        angle: 0,
+        startPage: pdfRenderer.pageNum,
+        repeatPage: 0,
+        text: text,
+        color: color,
+        fontFamily: fontFamily,
+        fontSize: fontSize
     });
     renderPage(pdfRenderer.pageNum);
 }
@@ -503,6 +630,64 @@ async function generateStampedPdf() {
         }
     }
 
+    for (const textStamp of pdfRenderer.textStamps) {
+        for (let i = textStamp.startPage - 1; i < pdfRenderer.numPages; i += textStamp.repeatPage > 0 ? textStamp.repeatPage : pdfRenderer.numPages) {
+            const page = pdfDoc.getPage(i);
+
+            const pdfX = textStamp.x;
+            const pdfY = pdfRenderer.viewport.height - textStamp.y - textStamp.fontSize;
+
+            let originX = pdfX;
+            let originY = pdfY + textStamp.fontSize;
+            let angle = toRadians(-textStamp.angle);
+
+            page.pushOperators(
+                PDFLib.pushGraphicsState(),
+                PDFLib.concatTransformationMatrix(
+                    1,
+                    0,
+                    0,
+                    1,
+                    originX,
+                    originY,
+                ),
+                PDFLib.concatTransformationMatrix(
+                    Math.cos(angle),
+                    Math.sin(angle),
+                    -Math.sin(angle),
+                    Math.cos(angle),
+                    0,
+                    0,
+                ),
+                PDFLib.concatTransformationMatrix(
+                    1,
+                    0,
+                    0,
+                    1,
+                    -1 * originX,
+                    -1 * originY,
+                ),
+            );
+
+            page.drawText(textStamp.text, {
+                x: pdfX,
+                y: pdfY,
+                size: textStamp.fontSize,
+                font: await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica),
+                color: PDFLib.rgb(
+                    parseInt(textStamp.color.slice(1, 3), 16) / 255,
+                    parseInt(textStamp.color.slice(3, 5), 16) / 255,
+                    parseInt(textStamp.color.slice(5, 7), 16) / 255
+                ),
+                opacity: textStamp.opacity,
+            });
+
+            page.pushOperators(
+                PDFLib.popGraphicsState(),
+            );
+        }
+    }
+
     // Save the modified PDF
     const pdfBytesWithWatermark = await pdfDoc.save();
 
@@ -550,3 +735,21 @@ function resizeCanvas() {
 }
 
 resizeCanvas();
+
+// Event listeners for custom text input fields and button
+const customTextInput = document.getElementById('customTextInput');
+const textColorInput = document.getElementById('textColorInput');
+const fontFamilyInput = document.getElementById('fontFamilyInput');
+const fontSizeInput = document.getElementById('fontSizeInput');
+const addTextStampButton = document.getElementById('addTextStamp');
+
+addTextStampButton.addEventListener('click', () => {
+    const text = customTextInput.value;
+    const color = textColorInput.value;
+    const fontFamily = fontFamilyInput.value;
+    const fontSize = parseInt(fontSizeInput.value, 10);
+
+    if (text && color && fontFamily && fontSize) {
+        addTextStamp(text, color, fontFamily, fontSize);
+    }
+});

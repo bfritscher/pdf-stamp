@@ -8,6 +8,7 @@ PDF Stamp is a web application that allows users to add stamps or signatures to 
 
 - **PDF Loading**: Load PDF files either from your local storage or by URL.
 - **Create Stamps**: Create custom stamps via drawing or image upload.
+- **Add Custom Text**: Add custom text with specified color, font family, and font-size.
 - **Stamp Management**: Add, remove, and adjust the opacity and position of stamps.
 - **Page Navigation**: Navigate through PDF pages to refine and adjust the placement of stamps.
 - **Download Stamped PDF**: Download the PDF with the added stamps.
@@ -35,12 +36,16 @@ Ensure you have a modern web browser that supports HTML5 and JavaScript ES6.
 2. **Add Stamps**: 
    - Click on the `Add` button to add a new stamp.
    - You can draw your signature on a canvas or upload an image to use as a stamp.
-3. **Manage Stamps**: 
+3. **Add Custom Text**:
+   - Enter the custom text in the input field.
+   - Select the desired color, font family, and font-size.
+   - Click the `Add Text Stamp` button to add the custom text to the PDF.
+4. **Manage Stamps**: 
    - Drag and resize the stamp to fit the desired position on the PDF.
    - Adjust the opacity using the slider.
    - Set the repeat interval for the stamp to appear on multiple pages.
-4. **Navigate Pages**: Use the `Prev` and `Next` buttons to navigate between pages.
-5. **Download PDF**: Click the `Download` tab once you're satisfied with your stamps.
+5. **Navigate Pages**: Use the `Prev` and `Next` buttons to navigate between pages.
+6. **Download PDF**: Click the `Download` tab once you're satisfied with your stamps.
 
 ## Local Storage
 

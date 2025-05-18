@@ -395,7 +395,32 @@
                     </div>
                 </div>
             </div>
-
+            <div class="paper">
+                <h2>Add Custom Text</h2>
+                <div class="row">
+                    <input type="text" id="customTextInput" placeholder="Enter custom text" />
+                </div>
+                <div class="row">
+                    <label for="textColorInput">Color:</label>
+                    <input type="color" id="textColorInput" value="#000000" />
+                </div>
+                <div class="row">
+                    <label for="fontFamilyInput">Font Family:</label>
+                    <select id="fontFamilyInput">
+                        <option value="Arial">Arial</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Verdana">Verdana</option>
+                    </select>
+                </div>
+                <div class="row">
+                    <label for="fontSizeInput">Font Size:</label>
+                    <input type="number" id="fontSizeInput" value="16" />
+                </div>
+                <div class="row">
+                    <button id="addTextStamp" class="primary">Add Text Stamp</button>
+                </div>
+            </div>
         </section>
     </main>
     <dialog id="signature-dialog">
