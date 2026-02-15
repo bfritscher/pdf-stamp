@@ -102,7 +102,9 @@
             opacity: 0.6;
         }
 
-        input {
+        input,
+        select,
+        textarea {
             display: block;
             padding: 10px;
             margin: 10px 0;
@@ -123,7 +125,9 @@
             height: 40px;
         }
 
-        input:focus {
+        input:focus,
+        select:focus,
+        textarea:focus {
             border-color: var(--primary-color);
             outline: none;
         }
@@ -165,18 +169,25 @@
             left: 0;
             display: block;
             user-select: none;
+            z-index: 2;
         }
 
         #pageBox>.canvas-container {
             position: absolute !important;
             top: 0;
             left: 0;
+            z-index: 1;
         }
 
         #pdfNav {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border: 1px solid #d9dee3;
+            border-radius: 6px;
+            background: #ffffff;
+            padding: 6px 8px;
+            margin-bottom: 8px;
         }
 
         #pdfNav>div {
@@ -194,15 +205,23 @@
             position: absolute;
             left: 0;
             right: 0;
-            background-color: #dbd9d9AA;
-            border: 1px solid #dbd9d9;
-            padding: 8px;
+            background-color: #ffffffee;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 10px;
             font-size: 10pt;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(140px, 1fr));
+            row-gap: 8px;
+            column-gap: 12px;
+            min-width: 320px;
+        }
+
+        .action-bar label {
             display: flex;
-            row-gap: 10px;
-            column-gap: 30px;
-            flex-wrap: wrap;
-            min-width: 170px;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
         }
 
         .action-bar .opacity {
@@ -216,6 +235,32 @@
             font-size: 10pt;
         }
 
+        .action-bar input,
+        .action-bar select {
+            margin: 0;
+            width: 100%;
+        }
+
+        .action-bar .pane-remove {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            border-radius: 4px;
+            padding: 4px 10px;
+            color: #fff;
+            background-color: var(--danger-color);
+            margin: 0;
+            border: none;
+            font-size: 9pt;
+            line-height: 1;
+            font-weight: 600;
+        }
+
+        .action-bar .pane-remove:hover {
+            background-color: var(--danger-color);
+            filter: brightness(0.95);
+        }
+
         .layout {
             display: flex;
             flex-direction: row-reverse;
@@ -225,20 +270,48 @@
 
         }
 
-        #addSrcStamp {
-            width: 200px;
-            margin: 0;
-        }
-
         #srcStampsPreview {
             display: flex;
-            flex-wrap: wrap;
-            align-content: flex-start;
+            flex-direction: column;
             gap: 10px;
             overflow: auto;
         }
 
-        #srcStampsPreview>div {
+        .source-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 8px;
+            border: 1px solid #d9dee3;
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        .action-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .action-group-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #616b75;
+            margin: 0;
+        }
+
+        .source-actions button {
+            width: 100%;
+            margin: 0;
+        }
+
+        #quickMerge {
+            font-size: 1.05rem;
+            padding-top: 12px;
+            padding-bottom: 12px;
+        }
+
+        #srcStampsPreview>.stamp-source {
             flex-shrink: 0;
             border: 1px solid #aaa;
             width: 200px;
@@ -267,11 +340,11 @@
             background-color: var(--danger-color);
         }
 
-        #srcStampsPreview>div:hover {
+        #srcStampsPreview>.stamp-source:hover {
             border-color: var(--primary-color);
         }
 
-        #srcStampsPreview>div:hover:after {
+        #srcStampsPreview>.stamp-source:hover:after {
             content: '+';
             position: absolute;
             top: 10px;
@@ -311,6 +384,47 @@
             text-align: center;
         }
 
+        #merge-dialog textarea {
+            width: 100%;
+            min-height: 160px;
+            box-sizing: border-box;
+            resize: vertical;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        #recordNav {
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px dashed #b8c0c8;
+            border-radius: 6px;
+            background: #f5f7f9;
+            padding: 6px 8px;
+            margin-bottom: 10px;
+        }
+
+        #recordNav>div {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #recordSelect {
+            min-width: 180px;
+            margin: 0;
+            height: 42px;
+            background-color: #fff;
+        }
+
+        #merge-dialog .caption {
+            text-align: left;
+            margin: 0;
+        }
+
         @media (max-width: 768px) {
             .layout {
                 flex-direction: column;
@@ -329,7 +443,7 @@
         }
 
         @media (pointer: coarse) and (hover: none) {
-            #srcStampsPreview>div:after {
+            #srcStampsPreview>.stamp-source:after {
                 content: '+';
                 position: absolute;
                 top: 10px;
@@ -389,6 +503,14 @@
                             </div>
                             <button id="nextPage">Next</button>
                         </div>
+                        <div id="recordNav" class="row">
+                            <button id="prevRecord">Prev Record</button>
+                            <div>
+                                <select id="recordSelect"></select>
+                                <span id="recordCount"></span>
+                            </div>
+                            <button id="nextRecord">Next Record</button>
+                        </div>
                         <div id="pageBox">
 
                         </div>
@@ -400,7 +522,7 @@
     </main>
     <dialog id="signature-dialog">
         <h2 class="row">
-            <div>Please Sign Below or <button id="loadImage" class="primary">Load Image</button></div>
+            <div>Please Sign Below</div>
             <div class="spacer"></div>
             <button id="padClose">Close</button>
         </h2>
@@ -414,6 +536,18 @@
             <button id="padClear">Clear</button>
             <div class="spacer"></div>
             <button id="padStampAdd" class="primary">Add</button>
+        </div>
+    </dialog>
+
+    <dialog id="merge-dialog">
+        <h2 class="row">
+            <div>Merge Data</div>
+        </h2>
+        <p class="caption">One record per line. Used for merge-linked text and QR stamps, and export duplication.</p>
+        <textarea id="mergeEntriesInput" placeholder="A&#10;B&#10;C"></textarea>
+        <div class="row">
+            <div class="spacer"></div>
+            <button id="mergeOk" class="primary">OK</button>
         </div>
     </dialog>
 
