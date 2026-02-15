@@ -3,6 +3,13 @@ import SignaturePad from 'https://unpkg.com/signature_pad@5.0.1/dist/signature_p
 
 const SRC_STAMPS_LOCAL_STORAGE_KEY = 'pdf-stamps-srcStamps';
 
+// QR merge state
+let qrMergeData = {
+    entries: [],
+    selectedIndex: 0,
+    imageCache: {} // Cache QR stamp images by text
+};
+
 // The workerSrc property shall be specified.
 pdfjsLib.GlobalWorkerOptions.workerSrc = '//unpkg.com/pdfjs-dist@4.2.67/build/pdf.worker.min.mjs';
 
@@ -117,6 +124,48 @@ padStampAdd.addEventListener('click', () => {
 const loadImage = document.getElementById('loadImage');
 loadImage.addEventListener('click', handleAddSrcStamp);
 
+// QR Merge dialog elements
+const qrMergeDialog = document.getElementById('qr-merge-dialog');
+const qrMergeBtn = document.getElementById('qrMergeBtn');
+const qrTextInput = document.getElementById('qr-text-input');
+const qrMergeCancel = document.getElementById('qr-merge-cancel');
+const qrMergeCreate = document.getElementById('qr-merge-create');
+const qrDataSelect = document.getElementById('qr-data-select');
+const qrDataCount = document.getElementById('qr-data-count');
+const qrMergeSelector = document.getElementById('qr-merge-selector');
+
+qrMergeBtn.addEventListener('click', () => {
+    dialog.close();
+    qrMergeDialog.showModal();
+});
+
+qrMergeCancel.addEventListener('click', () => {
+    qrMergeDialog.close();
+});
+
+qrMergeCreate.addEventListener('click', () => {
+    const text = qrTextInput.value.trim();
+    if (!text) {
+        alert('Please enter at least one text entry');
+        return;
+    }
+    
+    const entries = text.split('\n').filter(line => line.trim()).map(line => line.trim());
+    if (entries.length === 0) {
+        alert('Please enter at least one text entry');
+        return;
+    }
+    
+    createQRMergeStamp(entries);
+    qrMergeDialog.close();
+    qrTextInput.value = '';
+});
+
+qrDataSelect.addEventListener('change', () => {
+    qrMergeData.selectedIndex = parseInt(qrDataSelect.value);
+    renderPage(pdfRenderer.pageNum);
+});
+
 function renderSrcStampsPreview() {
     const srcStampsPreview = document.getElementById('srcStampsPreview');
     srcStampsPreview.innerHTML = '';
@@ -187,6 +236,162 @@ function addSrcStamp(srcStamp) {
     srcStamps.push(srcStamp);
     renderSrcStampsPreview();
     saveSrcStamps();
+}
+
+function createQRMergeStamp(entries) {
+    // Store entries for later use
+    qrMergeData.entries = entries;
+    qrMergeData.selectedIndex = 0;
+    
+    // Generate a stamp with first entry (async)
+    generateQRStampImageAsync(entries[0]).then(qrStampData => {
+        // Cache this image
+        qrMergeData.imageCache[entries[0]] = qrStampData.url;
+        
+        // Create a special stamp with QR merge data
+        const srcStamp = {
+            width: qrStampData.width,
+            height: qrStampData.height,
+            url: qrStampData.url,
+            isQRMerge: true,
+            entries: entries
+        };
+        
+        addSrcStamp(srcStamp);
+        updateQRMergeSelector();
+    });
+}
+
+function generateQRStampImageAsync(text) {
+    // Check cache first
+    if (qrMergeData.imageCache[text]) {
+        return Promise.resolve({
+            width: 240,
+            height: 300,
+            url: qrMergeData.imageCache[text]
+        });
+    }
+    
+    return new Promise((resolve) => {
+        // Create a canvas to draw text and QR code
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas size
+        const qrSize = 200;
+        const textHeight = 60;
+        const padding = 20;
+        canvas.width = qrSize + padding * 2;
+        canvas.height = qrSize + textHeight + padding * 3;
+        
+        // Fill white background
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw text at top
+        ctx.fillStyle = 'black';
+        ctx.font = 'bold 18px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        
+        // Wrap text if too long
+        const maxWidth = canvas.width - padding * 2;
+        const words = text.split(' ');
+        let line = '';
+        let y = padding;
+        const lineHeight = 22;
+        
+        for (let i = 0; i < words.length; i++) {
+            const testLine = line + words[i] + ' ';
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > maxWidth && i > 0) {
+                ctx.fillText(line, canvas.width / 2, y);
+                line = words[i] + ' ';
+                y += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line, canvas.width / 2, y);
+        
+        // Generate QR code in a temporary container
+        const tempDiv = document.createElement('div');
+        tempDiv.style.display = 'none';
+        document.body.appendChild(tempDiv);
+        
+        const qr = new QRCode(tempDiv, {
+            text: text,
+            width: qrSize,
+            height: qrSize,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H
+        });
+        
+        // Wait for QR code to be generated
+        setTimeout(() => {
+            const qrImg = tempDiv.querySelector('img');
+            if (qrImg) {
+                // Wait for image to load
+                if (qrImg.complete) {
+                    ctx.drawImage(qrImg, padding, textHeight + padding * 2, qrSize, qrSize);
+                    document.body.removeChild(tempDiv);
+                    const dataUrl = canvas.toDataURL();
+                    qrMergeData.imageCache[text] = dataUrl;
+                    resolve({
+                        width: canvas.width,
+                        height: canvas.height,
+                        url: dataUrl
+                    });
+                } else {
+                    qrImg.onload = () => {
+                        ctx.drawImage(qrImg, padding, textHeight + padding * 2, qrSize, qrSize);
+                        document.body.removeChild(tempDiv);
+                        const dataUrl = canvas.toDataURL();
+                        qrMergeData.imageCache[text] = dataUrl;
+                        resolve({
+                            width: canvas.width,
+                            height: canvas.height,
+                            url: dataUrl
+                        });
+                    };
+                }
+            } else {
+                document.body.removeChild(tempDiv);
+                const dataUrl = canvas.toDataURL();
+                resolve({
+                    width: canvas.width,
+                    height: canvas.height,
+                    url: dataUrl
+                });
+            }
+        }, 200);
+    });
+}
+
+function getQRStampImage(text) {
+    // Synchronous cache lookup - returns cached URL or undefined
+    return qrMergeData.imageCache[text];
+}
+
+function updateQRMergeSelector() {
+    const hasQRMerge = srcStamps.some(s => s.isQRMerge) || 
+                       pdfRenderer.stamps.some(s => s.isQRMerge);
+    
+    if (hasQRMerge && qrMergeData.entries.length > 0) {
+        qrMergeSelector.style.display = 'flex';
+        qrDataSelect.innerHTML = '';
+        qrMergeData.entries.forEach((entry, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = entry.length > 30 ? entry.substring(0, 30) + '...' : entry;
+            qrDataSelect.appendChild(option);
+        });
+        qrDataSelect.value = qrMergeData.selectedIndex;
+        qrDataCount.textContent = `(${qrMergeData.entries.length} entries total)`;
+    } else {
+        qrMergeSelector.style.display = 'none';
+    }
 }
 
 function loadSrcStamps() {
@@ -277,6 +482,7 @@ async function renderPage(pageNumber) {
     resizePageBox();
     renderPdfNav();
     renderDownloadTab();
+    updateQRMergeSelector();
 }
 
 function renderPdfNav() {
@@ -331,7 +537,22 @@ function renderStamps() {
             return;
         }
 
-        fabric.Image.fromURL(s.url, (img, err) => {
+        // If this is a QR merge stamp, use cached image with selected entry
+        let stampUrl = s.url;
+        if (s.isQRMerge && s.entries && s.entries.length > qrMergeData.selectedIndex) {
+            const text = s.entries[qrMergeData.selectedIndex];
+            const cachedUrl = getQRStampImage(text);
+            if (cachedUrl) {
+                stampUrl = cachedUrl;
+            } else {
+                // Generate asynchronously and re-render when ready
+                generateQRStampImageAsync(text).then(() => {
+                    renderPage(pdfRenderer.pageNum);
+                });
+            }
+        }
+
+        fabric.Image.fromURL(stampUrl, (img, err) => {
             const div = document.createElement('div');
             div.classList.add('stamp');
 
@@ -348,6 +569,15 @@ function renderStamps() {
             const actionBar = document.createElement('div');
             actionBar.classList.add('action-bar');
             div.append(actionBar);
+            
+            // Add QR merge badge if applicable
+            if (s.isQRMerge) {
+                const badge = document.createElement('span');
+                badge.classList.add('qr-preview-badge');
+                badge.textContent = 'QR';
+                div.appendChild(badge);
+            }
+            
             const inputRepeat = document.createElement('input');
             inputRepeat.classList.add('repeat');
             inputRepeat.type = 'number';
@@ -410,7 +640,7 @@ function addStamp(srcStamp) {
     const scaleY = pdfRenderer.viewport.height / srcStamp.height;
     const scale = Math.min(scaleX, scaleY, 1.0);
 
-    pdfRenderer.stamps.push({
+    const stamp = {
         x: 0,
         y: 0,
         width: srcStamp.width,
@@ -422,7 +652,17 @@ function addStamp(srcStamp) {
         startPage: pdfRenderer.pageNum,
         repeatPage: 0,
         url: srcStamp.url
-    });
+    };
+    
+    // Copy QR merge properties if present
+    if (srcStamp.isQRMerge) {
+        stamp.isQRMerge = true;
+        stamp.entries = srcStamp.entries;
+        qrMergeData.entries = srcStamp.entries;
+        qrMergeData.selectedIndex = 0;
+    }
+    
+    pdfRenderer.stamps.push(stamp);
     renderPage(pdfRenderer.pageNum);
 }
 
@@ -431,11 +671,48 @@ function toRadians(degree) {
 };
 
 async function generateStampedPdf() {
+    // Check if any stamps are QR merge stamps
+    const hasQRMerge = pdfRenderer.stamps.some(s => s.isQRMerge);
+    
+    if (hasQRMerge && qrMergeData.entries.length > 0) {
+        // Pre-generate all QR images
+        for (let i = 0; i < qrMergeData.entries.length; i++) {
+            const text = qrMergeData.entries[i];
+            if (!getQRStampImage(text)) {
+                await generateQRStampImageAsync(text);
+            }
+        }
+        
+        // Generate one PDF per entry
+        for (let i = 0; i < qrMergeData.entries.length; i++) {
+            await generateSingleStampedPdf(i, qrMergeData.entries[i]);
+        }
+    } else {
+        // Generate single PDF as before
+        await generateSingleStampedPdf(-1, null);
+    }
+}
+
+async function generateSingleStampedPdf(entryIndex, entryText) {
     const pdfDoc = await PDFLib.PDFDocument.load(await pdfRenderer.pdf.getData());
 
     for (const stamp of pdfRenderer.stamps) {
+        // Generate the appropriate stamp URL
+        let stampUrl = stamp.url;
+        if (stamp.isQRMerge && entryIndex >= 0 && stamp.entries && stamp.entries.length > entryIndex) {
+            const text = stamp.entries[entryIndex];
+            const cachedUrl = getQRStampImage(text);
+            if (cachedUrl) {
+                stampUrl = cachedUrl;
+            } else {
+                // Should have been pre-generated, but generate if missing
+                const qrStampData = await generateQRStampImageAsync(text);
+                stampUrl = qrStampData.url;
+            }
+        }
+        
         // TODO test if can reuse image for same stampSrc
-        const image = await pdfDoc.embedPng(stamp.url);
+        const image = await pdfDoc.embedPng(stampUrl);
         for (let i = stamp.startPage - 1; i < pdfRenderer.numPages; i += stamp.repeatPage > 0 ? stamp.repeatPage : pdfRenderer.numPages) {
             // 0 indexex
             const page = pdfDoc.getPage(i);
@@ -513,7 +790,16 @@ async function generateStampedPdf() {
     // Create a link to download the watermarked PDF
     const downloadLink = document.createElement('a');
     downloadLink.href = url;
-    downloadLink.download = pdfRenderer.filename.replace('.pdf', '-stamped.pdf');
+    
+    // Generate filename based on entry
+    let filename = pdfRenderer.filename.replace('.pdf', '-stamped.pdf');
+    if (entryIndex >= 0 && entryText) {
+        // Sanitize filename
+        const sanitized = entryText.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+        filename = pdfRenderer.filename.replace('.pdf', `-${sanitized}.pdf`);
+    }
+    downloadLink.download = filename;
+    
     document.body.append(downloadLink);
     downloadLink.click();
 

@@ -12,6 +12,7 @@
         rel="stylesheet">
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.js"> </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root {
             --primary-color: #28a745;
@@ -311,6 +312,36 @@
             text-align: center;
         }
 
+        #qr-merge-dialog {
+            max-width: 600px;
+        }
+
+        .qr-merge-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .qr-merge-controls select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .qr-preview-badge {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
         @media (max-width: 768px) {
             .layout {
                 flex-direction: column;
@@ -381,6 +412,11 @@
 
                 </div>
                 <div>
+                    <div id="qr-merge-selector" class="qr-merge-controls" style="display: none;">
+                        <label for="qr-data-select">Select data entry:</label>
+                        <select id="qr-data-select"></select>
+                        <span id="qr-data-count"></span>
+                    </div>
                     <div>
                         <div id="pdfNav" class="row">
                             <button id="prevPage">Prev</button>
@@ -400,7 +436,7 @@
     </main>
     <dialog id="signature-dialog">
         <h2 class="row">
-            <div>Please Sign Below or <button id="loadImage" class="primary">Load Image</button></div>
+            <div>Please Sign Below or <button id="loadImage" class="primary">Load Image</button> or <button id="qrMergeBtn" class="primary">QR Mail Merge</button></div>
             <div class="spacer"></div>
             <button id="padClose">Close</button>
         </h2>
@@ -414,6 +450,20 @@
             <button id="padClear">Clear</button>
             <div class="spacer"></div>
             <button id="padStampAdd" class="primary">Add</button>
+        </div>
+    </dialog>
+
+    <dialog id="qr-merge-dialog">
+        <h2>QR Code Mail Merge</h2>
+        <p class="caption">Create a stamp with text and QR code. One PDF will be generated for each data entry.</p>
+        <div>
+            <label for="qr-text-input">Enter text (one entry per line):</label>
+            <textarea id="qr-text-input" rows="10" style="width: 100%; padding: 10px; margin: 10px 0; font-family: monospace; border: 1px solid #ccc; border-radius: 4px;"></textarea>
+        </div>
+        <div class="row">
+            <button id="qr-merge-cancel">Cancel</button>
+            <div class="spacer"></div>
+            <button id="qr-merge-create" class="primary">Create Stamp</button>
         </div>
     </dialog>
 
