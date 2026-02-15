@@ -8,6 +8,7 @@ PDF Stamp is a web application that allows users to add stamps or signatures to 
 
 - **PDF Loading**: Load PDF files either from your local storage or by URL.
 - **Create Stamps**: Create custom stamps via drawing or image upload.
+- **QR Code Mail Merge**: Create stamps with text and QR codes for batch processing multiple documents.
 - **Stamp Management**: Add, remove, and adjust the opacity and position of stamps.
 - **Page Navigation**: Navigate through PDF pages to refine and adjust the placement of stamps.
 - **Download Stamped PDF**: Download the PDF with the added stamps.
@@ -21,6 +22,7 @@ PDF Stamp is a web application that allows users to add stamps or signatures to 
   - [signature_pad](https://github.com/szimek/signature_pad) for signature creation.
   - [fabric.js](http://fabricjs.com/) for handling canvas and stamps.
   - [pdf-lib](https://pdf-lib.js.org/) for PDF manipulation.
+  - [qrcodejs](https://github.com/davidshimjs/qrcodejs) for QR code generation.
   
 
 ## Getting Started
@@ -35,12 +37,19 @@ Ensure you have a modern web browser that supports HTML5 and JavaScript ES6.
 2. **Add Stamps**: 
    - Click on the `Add` button to add a new stamp.
    - You can draw your signature on a canvas or upload an image to use as a stamp.
-3. **Manage Stamps**: 
+   - **NEW**: Click on `QR Mail Merge` to create a stamp with text and QR code for batch processing.
+3. **QR Mail Merge Workflow**:
+   - Enter multiple text entries (one per line) in the dialog.
+   - A stamp will be created showing both the text and a QR code encoding that text.
+   - Use the data entry selector to preview different entries.
+   - When you download, one PDF will be generated for each data entry with unique QR codes.
+   - Files will be automatically named based on the text content.
+4. **Manage Stamps**: 
    - Drag and resize the stamp to fit the desired position on the PDF.
    - Adjust the opacity using the slider.
    - Set the repeat interval for the stamp to appear on multiple pages.
-4. **Navigate Pages**: Use the `Prev` and `Next` buttons to navigate between pages.
-5. **Download PDF**: Click the `Download` tab once you're satisfied with your stamps.
+5. **Navigate Pages**: Use the `Prev` and `Next` buttons to navigate between pages.
+6. **Download PDF**: Click the `Download` tab once you're satisfied with your stamps.
 
 ## Local Storage
 
