@@ -3,6 +3,10 @@ import SignaturePad from 'https://unpkg.com/signature_pad@5.0.1/dist/signature_p
 
 const SRC_STAMPS_LOCAL_STORAGE_KEY = 'pdf-stamps-srcStamps';
 
+// QR merge configuration
+const QR_CODE_GENERATION_TIMEOUT_MS = 500; // Timeout for QR code image generation
+const QR_FILENAME_MAX_LENGTH = 50; // Maximum characters from text for filename
+
 // QR merge state
 let qrMergeData = {
     entries: [],
@@ -365,7 +369,7 @@ function generateQRStampImageAsync(text) {
                     url: dataUrl
                 });
             }
-        }, 200);
+        }, QR_CODE_GENERATION_TIMEOUT_MS);
     });
 }
 
@@ -714,7 +718,7 @@ async function generateSingleStampedPdf(entryIndex, entryText) {
         // TODO test if can reuse image for same stampSrc
         const image = await pdfDoc.embedPng(stampUrl);
         for (let i = stamp.startPage - 1; i < pdfRenderer.numPages; i += stamp.repeatPage > 0 ? stamp.repeatPage : pdfRenderer.numPages) {
-            // 0 indexex
+            // 0 indexed
             const page = pdfDoc.getPage(i);
 
             // Convert coordinates from web (viewport) to PDF reference
@@ -795,7 +799,7 @@ async function generateSingleStampedPdf(entryIndex, entryText) {
     let filename = pdfRenderer.filename.replace('.pdf', '-stamped.pdf');
     if (entryIndex >= 0 && entryText) {
         // Sanitize filename
-        const sanitized = entryText.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+        const sanitized = entryText.replace(/[^a-z0-9]/gi, '_').substring(0, QR_FILENAME_MAX_LENGTH);
         filename = pdfRenderer.filename.replace('.pdf', `-${sanitized}.pdf`);
     }
     downloadLink.download = filename;
